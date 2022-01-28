@@ -64,12 +64,19 @@ FailsNowhere                    PROCEDURE(STRING Word),BOOL              !Does w
   
 !==============================================================================
 LoadWords                     PROCEDURE
+WordsAlphaTxt                   EQUATE('words_alpha.txt')
+WordsFilename                   STRING(FILE:MaxFilePath),STATIC
 WordsFile                       FILE,DRIVER('ASCII'),NAME('.\english-words\words_alpha.txt'),PRE(WF)
                                   RECORD
 Word                                STRING(30)
                                   END
                                 END
   CODE
+  WordsFilename = 'english-words/'& WordsAlphaTxt
+  IF NOT EXISTS(WordsFilename)
+    WordsFilename = WordsAlphaTxt
+  END
+  
   OPEN(WordsFile, 22h)
   SET(WordsFile)
   LOOP
