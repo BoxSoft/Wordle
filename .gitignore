@@ -5,5 +5,6 @@
 /obj/debug/Wordle.cwproj.FileList.xml
 *.lib
 *.MAP
-/words.txt
-/Wordle.sln.cache
+words.txt
+Wordle.sln.cache
+/cache/

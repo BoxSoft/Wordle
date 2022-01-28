@@ -9,6 +9,9 @@
     <OutputName>Wordle</OutputName>
     <Model>Dll</Model>
     <ApplicationIcon>Wordle.ico</ApplicationIcon>
+    <DefineConstants>_AnyScreenPresent_=&gt;1</DefineConstants>
+    <stack_size>16384</stack_size>
+    <CopyCore>True</CopyCore>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>True</DebugSymbols>
@@ -16,6 +19,11 @@
     <vid>full</vid>
     <check_stack>True</check_stack>
     <check_index>True</check_index>
+    <warnings>on</warnings>
+    <GenerateMap>True</GenerateMap>
+    <line_numbers>False</line_numbers>
+    <dynamic_base>True</dynamic_base>
+    <dep>True</dep>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugSymbols>False</DebugSymbols>
@@ -29,6 +37,8 @@
   </ItemGroup>
   <ItemGroup>
     <FileDriver Include="ASCII" />
+    <Library Include="ClaAnyScreen.lib" />
+    <Library Include="ClaAnyScreenNet.lib" />
   </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
 </Project>

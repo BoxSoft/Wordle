@@ -1,6 +1,7 @@
                               PROGRAM
 
   INCLUDE('Errors.clw'),ONCE
+  !INCLUDE('AnyScreen.inc'),ONCE
 
 WORD_LENGTH                   EQUATE(5)
 
@@ -24,7 +25,7 @@ LetterState:Missed              EQUATE
 LetterState:Correct             EQUATE
                               END
 
-LetterClass                   CLASS,TYPE                    !Class to manage clickable letter keys
+LetterKeyClass                CLASS,TYPE                    !Class to manage clickable letter keys
 State                           BYTE                        !From LetterState:*
 StringFEQ                       SIGNED                      !Letter key STRING
 RegionFEQ                       SIGNED                      !Created REGION overlapping STRING
@@ -39,7 +40,7 @@ LetterQ                       QUEUE                         !Queue of all 26 let
 Letter                          STRING(1)                   !Letter
 Score                           LONG                        !Total score of letter
 ScorePos                        LONG,DIM(5)                 !Score of letter in each word character position (1-5)
-Handler                         &LetterClass                !Instantiated object
+Handler                         &LetterKeyClass                !Instantiated object
                               END
 
 Letters                       CLASS                                      !Class to manage all letters as a collection
@@ -127,15 +128,15 @@ C                               BYTE,AUTO
   SORT(WordQ, -WordQ.Score)
   !ST::DebugQueue(WordQ, 'Word Scores')
 
-!==============================================================================
+!--------------------------------------
 ScoreWord                     PROCEDURE(STRING Word)!,LONG
 N                               BYTE
 Score                           LONG(0)
   CODE
   LOOP N = 1 TO WORD_LENGTH
-    IF N > 1 AND INSTRING(Word[N], Word[1:N-1], 1, 1) !Already scored this letter in this word?
-      CYCLE
-    END
+    !IF N > 1 AND INSTRING(Word[N], Word[1:N-1], 1, 1) !Already scored this letter in this word?
+    !  CYCLE
+    !END
     Score += Letters.GetScore(Word[N], N)
   END
   RETURN Score
@@ -147,14 +148,14 @@ InitWindow                      PROCEDURE
 Compute                         PROCEDURE
                               END
 
-Correct                         STRING(WORD_LENGTH)
-                                GROUP,OVER(Correct),PRE
+CorrectGroup                    GROUP,PRE
 Correct1                          STRING(1)
 Correct2                          STRING(1)
 Correct3                          STRING(1)
 Correct4                          STRING(1)
 Correct5                          STRING(1)
                                 END
+Correct                         STRING(WORD_LENGTH),OVER(CorrectGroup)
 
 MissedGroup                     GROUP,TYPE
 Letter                            STRING(1)
@@ -237,7 +238,8 @@ Window                          WINDOW('Wordle Tool'),AT(,,172,142),CENTER,GRAY,
                                   STRING('B'),AT(70,128,10,10),USE(?Letter:B),CENTER,COLOR(COLOR:Gray)
                                   STRING('N'),AT(82,128,10,10),USE(?Letter:N),CENTER,COLOR(COLOR:Gray)
                                   STRING('M'),AT(94,128,10,10),USE(?Letter:M),CENTER,COLOR(COLOR:Gray)
-                                  LIST,AT(127,4,42,134),USE(?PossibleList),FLAT,NOBAR,VSCROLL,FROM(PossibleQ),FORMAT('30L(2)@S5@')
+                                  LIST,AT(127,4,42,134),USE(?PossibleList),FLAT,NOBAR,VSCROLL,FROM(PossibleQ), |
+                                      FORMAT('30L(2)@S5@')
                                 END
 
   CODE
@@ -261,34 +263,25 @@ Window                          WINDOW('Wordle Tool'),AT(,,172,142),CENTER,GRAY,
 
 !--------------------------------------
 InitWindow                    PROCEDURE
-FEQ                             SIGNED,AUTO
+StringFEQ                       SIGNED,AUTO
   CODE
-  LOOP FEQ = ?Letter:Q TO ?Letter:M
-    Letters.InitControl(FEQ)
+  LOOP StringFEQ = ?Letter:Q TO ?Letter:M
+    Letters.InitControl(StringFEQ)
   END
   
 !--------------------------------------
 Compute                       PROCEDURE
                               MAP
+FailsCorrect                    PROCEDURE,BOOL
 FailsMissed                     PROCEDURE(*MissedGroup Missed),BOOL
                               END
 W                               LONG
-X                               LONG
   CODE
   FREE(PossibleQ)
-W LOOP W = 1 TO RECORDS(WordQ)
+  LOOP W = 1 TO RECORDS(WordQ)
     GET(WordQ, W)
 
-    IF Correct <> ''
-      LOOP X = 1 TO WORD_LENGTH
-        CASE Correct[X]
-        OF '' OROF WordQ.Word[X]
-          !No-op
-        ELSE
-          CYCLE W
-        END
-      END
-    END
+    IF FailsCorrect() THEN CYCLE.
     
     IF FailsMissed(Missed1) THEN CYCLE.
     IF FailsMissed(Missed2) THEN CYCLE.
@@ -304,33 +297,61 @@ W LOOP W = 1 TO RECORDS(WordQ)
   !ST::DebugQueue(PossibleQ)
   DISPLAY(?PossibleList)
 
+FailsCorrect                  PROCEDURE!,BOOL
+X                               LONG
+  CODE
+  IF Correct <> ''
+    LOOP X = 1 TO WORD_LENGTH
+      CASE Correct[X]
+      OF '' OROF WordQ.Word[X]
+        !No-op
+      ELSE
+        RETURN TRUE
+      END
+    END
+  END
+  RETURN FALSE
+
 FailsMissed                   PROCEDURE(*MissedGroup Missed)!,BOOL
+!MissedGroup                     GROUP,TYPE
+!Letter                            STRING(1)
+!Pos1                              BYTE
+!Pos2                              BYTE
+!Pos3                              BYTE
+!Pos4                              BYTE
+!Pos5                              BYTE
+!                                END
+
 M                               GROUP,AUTO
 Letter                            STRING(1)
 Pos                               BYTE,DIM(WORD_LENGTH)
                                 END
 C                               BYTE,AUTO
   CODE
+  ASSERT(SIZE(MissedGroup)=SIZE(M), 'FailsMissed M group is different size than MissedGroup')
+
   IF Missed.Letter <> ''
-    IF NOT INSTRING(Missed.Letter, WordQ.Word, 1, 1)
+    !The letter needs to be somewhere in the word
+    IF NOT INSTRING(Missed.Letter, WordQ.Word)
       RETURN TRUE
-    ELSE
-      M = Missed
-      LOOP C = 1 TO WORD_LENGTH
-        IF M.Pos[C] AND WordQ.Word[C] = M.Letter THEN RETURN TRUE.
-      END
+    END
+    
+    !But not in a position were it's specified not to be
+    M = Missed
+    LOOP C = 1 TO WORD_LENGTH
+      IF M.Pos[C] AND WordQ.Word[C] = M.Letter THEN RETURN TRUE.
     END
   END
   RETURN FALSE
 
 !==============================================================================
 !==============================================================================
-LetterClass.Construct         PROCEDURE
+LetterKeyClass.Construct      PROCEDURE
   CODE
   SELF.State = LetterState:Unknown
 
 !==============================================================================
-LetterClass.InitControl       PROCEDURE(SIGNED StringFEQ)
+LetterKeyClass.InitControl    PROCEDURE(SIGNED StringFEQ)
 X                               LONG,AUTO
 Y                               LONG,AUTO
 W                               LONG,AUTO
@@ -344,27 +365,30 @@ H                               LONG,AUTO
   SELF.Display()
 
 !==============================================================================
-LetterClass.Display           PROCEDURE
+LetterKeyClass.Display        PROCEDURE
                               MAP
 SetColor                        PROCEDURE(LONG Background,LONG Foreground=COLOR:White)
                               END
   CODE
-  IF SELF.StringFEQ <> 0
-    CASE SELF.State
-      ;OF LetterState:Unknown;  SetColor(8684417                 )  !Gray
-      ;OF LetterState:Nowhere;  SetColor(3947066, COLOR:LightGray)  !Dark Gray
-      ;OF LetterState:Missed ;  SetColor(3907508                 )  !Yellow
-      ;OF LetterState:Correct;  SetColor(5147986                 )  !Green
-    END
+  ASSERT(SELF.StringFEQ <> 0, 'LetterKeyClass.Display StringFEQ=0')
+  CASE SELF.State
+    ;OF LetterState:Unknown;  SetColor(8684417                 )  !Gray
+    ;OF LetterState:Nowhere;  SetColor(3947066, COLOR:LightGray)  !Dark Gray
+    ;OF LetterState:Missed ;  SetColor(3907508                 )  !Yellow
+    ;OF LetterState:Correct;  SetColor(5147986                 )  !Green
   END
   
+  SELF.RegionFEQ{PROP:Cursor} = CHOOSE(~INLIST(SELF.State, LetterState:Missed, LetterState:Correct), | 
+      CURSOR:Hand, CURSOR:None)
+
+!--------------------------------------
 SetColor                      PROCEDURE(LONG Background,LONG Foreground)
   CODE
   SELF.StringFEQ{PROP:Background} = Background
   SELF.StringFEQ{PROP:FontColor } = Foreground
 
 !==============================================================================
-LetterClass.SetState          PROCEDURE(BYTE State)
+LetterKeyClass.SetState       PROCEDURE(BYTE State)
   CODE
   SELF.State = State
   SELF.Display()
@@ -372,18 +396,15 @@ LetterClass.SetState          PROCEDURE(BYTE State)
 !==============================================================================
 !Allow toggling the letter key between Nowhere and Unknown.
 !If it's Missing or Correct, then beep and leave as is.
-LetterClass.TakeEvent         PROCEDURE
+LetterKeyClass.TakeEvent      PROCEDURE
   CODE
-  IF SELF.RegionFEQ <> 0
-    CASE EVENT()
-    OF EVENT:Accepted
-      IF ACCEPTED() = SELF.RegionFEQ
-        CASE SELF.State
-          ;OF LetterState:Unknown;  SELF.SetState(LetterState:Nowhere)
-          ;OF LetterState:Nowhere;  SELF.SetState(LetterState:Unknown)
-          ;ELSE                  ;  BEEP
-        END
-      END
+  ASSERT(SELF.RegionFEQ <> 0, 'LetterKeyClass.TakeEvent RegionFEQ=0')
+
+  IF ACCEPTED() = SELF.RegionFEQ
+    CASE SELF.State
+      ;OF LetterState:Unknown;  SELF.SetState(LetterState:Nowhere)
+      ;OF LetterState:Nowhere;  SELF.SetState(LetterState:Unknown)
+      ;ELSE                  ;  BEEP
     END
   END
 
@@ -404,7 +425,7 @@ AddLetter                     PROCEDURE(STRING Letter)
   CODE
   CLEAR(LetterQ)
   LetterQ.Letter   = Letter
-  LetterQ.Handler &= NEW LetterClass
+  LetterQ.Handler &= NEW LetterKeyClass
   ADD(LetterQ, LetterQ.Letter)
 
 !==============================================================================
