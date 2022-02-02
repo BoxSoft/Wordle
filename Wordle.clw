@@ -476,7 +476,7 @@ Letters.AccumScore            PROCEDURE(STRING Letter,BYTE Pos)
 Letters.GetScore              PROCEDURE(STRING Letter,BYTE Pos)!,LONG
   CODE
   SELF.FetchLetter(Letter)
-  RETURN LetterQ.Score + LetterQ.ScorePos[Pos]
+  RETURN LetterQ.Score + CHOOSE(Letter='S' AND Pos=WORD_LENGTH, 0, LetterQ.ScorePos[Pos])
 
 !==============================================================================
 Letters.InitControl           PROCEDURE(SIGNED StringFEQ)
