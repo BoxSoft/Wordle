@@ -64,6 +64,9 @@ FailsNowhere                    PROCEDURE(STRING Word),BOOL              !Does w
   
 !==============================================================================
 LoadWords                     PROCEDURE
+                              MAP
+LoadWord                        PROCEDURE(STRING Word)
+                              END
 WordsAlphaTxt                   EQUATE('words_alpha.txt')
 WordsFilename                   STRING(FILE:MaxFilePath),STATIC
 WordsFile                       FILE,DRIVER('ASCII'),NAME('.\english-words\words_alpha.txt'),PRE(WF)
@@ -83,11 +86,21 @@ Word                                STRING(30)
     NEXT(WordsFile)
     IF ERRORCODE() <> NoError THEN BREAK.
     IF LEN(CLIP(WF:Word)) <> WORD_LENGTH THEN CYCLE.
-        
-    CLEAR(WordQ)
-    WordQ.Word = UPPER(WF:Word)
-    ADD(WordQ)
+    LoadWord(WF:Word)
   END
+                        
+  WordQ.Word = 'SOARE'
+  GET(WordQ, WordQ.Word)
+  IF ERRORCODE() <> NoError
+    LoadWord('SOARE')
+  END
+
+!--------------------------------------
+LoadWord                      PROCEDURE(STRING Word)
+  CODE
+  CLEAR(WordQ)
+  WordQ.Word = UPPER(Word)
+  ADD(WordQ)
 
 !==============================================================================
 CountDoubles                  PROCEDURE
@@ -133,7 +146,9 @@ C                               BYTE,AUTO
     PUT(WordQ)
   END
   SORT(WordQ, -WordQ.Score)
-  !ST::DebugQueue(WordQ, 'Word Scores')
+  WordQ.Word = 'SOARE'
+  GET(WordQ, WordQ.Word)
+  ST::DebugQueue(WordQ, 'Word Scores')
 
 !--------------------------------------
 ScoreWord                     PROCEDURE(STRING Word)!,LONG
@@ -141,9 +156,7 @@ N                               BYTE
 Score                           LONG(0)
   CODE
   LOOP N = 1 TO WORD_LENGTH
-    !IF N > 1 AND INSTRING(Word[N], Word[1:N-1], 1, 1) !Already scored this letter in this word?
-    !  CYCLE
-    !END
+    IF N > 1 AND INSTRING(Word[N], Word[1:N-1]) THEN CYCLE. !Already scored this letter in this word?
     Score += Letters.GetScore(Word[N], N)
   END
   RETURN Score
@@ -463,7 +476,7 @@ Letters.AccumScore            PROCEDURE(STRING Letter,BYTE Pos)
 Letters.GetScore              PROCEDURE(STRING Letter,BYTE Pos)!,LONG
   CODE
   SELF.FetchLetter(Letter)
-  RETURN LetterQ.ScorePos[Pos]
+  RETURN LetterQ.Score + LetterQ.ScorePos[Pos]
 
 !==============================================================================
 Letters.InitControl           PROCEDURE(SIGNED StringFEQ)
